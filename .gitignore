@@ -1,0 +1,15 @@
+@'
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+local.settings.json
+.env
+*.parquet
+*.zip
+bronze/
+silver/
+rejected/
+.python_packages/
+'@ | Set-Content -Encoding utf8 .gitignore
