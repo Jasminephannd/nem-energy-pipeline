@@ -1,15 +1,19 @@
-@'
+# Python
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+*.egg-info/
+.python_packages/
+
+# Secrets / local config
 local.settings.json
 .env
+
+# Data (never commit NEMWeb payloads)
 *.parquet
 *.zip
 bronze/
 silver/
 rejected/
-.python_packages/
-'@ | Set-Content -Encoding utf8 .gitignore
