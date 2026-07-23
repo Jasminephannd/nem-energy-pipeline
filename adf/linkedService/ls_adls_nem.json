@@ -1,0 +1,10 @@
+{
+	"name": "ls_adls_nem",
+	"properties": {
+		"annotations": [],
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "https://stnemv3gnwzv72hd7s.dfs.core.windows.net/"
+		}
+	}
+}
