@@ -29,15 +29,42 @@ import argparse
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 NEMWEB_BASE = "https://nemweb.com.au/Reports/Current"
 
 # A request without a browser-like User-Agent is sometimes refused by nemweb.
 _HTTP_HEADERS = {"User-Agent": "nem-energy-pipeline/1.0 (portfolio project)"}
+
+# nemweb throttles aggressive callers with HTTP 403/429. Two defences:
+#   1. a small pause between downloads so we stay under the rate limit, and
+#   2. retry-with-backoff when we hit it anyway.
+REQUEST_DELAY_SECONDS = 0.25
+
+
+def _build_session() -> requests.Session:
+    """Session that retries throttling responses with exponential backoff."""
+    session = requests.Session()
+    session.headers.update(_HTTP_HEADERS)
+    retry = Retry(
+        total=5,
+        backoff_factor=1.5,  # exponential: ~1.5s, 3s, 6s, 12s, 24s between tries
+        status_forcelist=(403, 429, 500, 502, 503, 504),
+        allowed_methods=("GET",),
+        respect_retry_after_header=True,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    return session
+
+
+_SESSION = _build_session()
 
 
 @dataclass(frozen=True)
@@ -91,7 +118,7 @@ def blob_path(feed_name: str, filename: str, ts: datetime) -> str:
 def list_available_files(feed: Feed) -> list[str]:
     """Return the .zip filenames listed in a feed's Current/ directory."""
     url = f"{NEMWEB_BASE}/{feed.directory}/"
-    resp = requests.get(url, headers=_HTTP_HEADERS, timeout=30)
+    resp = _SESSION.get(url, timeout=30)
     resp.raise_for_status()
     # The listing is an HTML index; pull every href ending in .zip.
     names = re.findall(r'href="[^"]*?([^"/]+\.zip)"', resp.text, re.IGNORECASE)
@@ -106,7 +133,7 @@ def list_available_files(feed: Feed) -> list[str]:
 def download_zip(feed: Feed, filename: str) -> bytes:
     """Download one report zip. Files are small (tens of KB), so in-memory."""
     url = f"{NEMWEB_BASE}/{feed.directory}/{filename}"
-    resp = requests.get(url, headers=_HTTP_HEADERS, timeout=60)
+    resp = _SESSION.get(url, timeout=60)
     resp.raise_for_status()
     return resp.content
 
@@ -128,7 +155,7 @@ def _container_client(account: str):
 
 def run(account: str, feeds: list[Feed], limit: int, dry_run: bool) -> None:
     container = None if dry_run else _container_client(account)
-    uploaded = skipped = 0
+    uploaded = skipped = failed = 0
 
     for feed in feeds:
         available = list_available_files(feed)
@@ -150,14 +177,26 @@ def run(account: str, feeds: list[Feed], limit: int, dry_run: bool) -> None:
                 skipped += 1
                 continue
 
-            blob.upload_blob(download_zip(feed, filename), overwrite=False)
+            # One bad file (e.g. throttled past all retries, or rolled off the
+            # Current window mid-run) must not abort the whole batch. Log and
+            # move on — a re-run picks it up thanks to the exists() check above.
+            try:
+                data = download_zip(feed, filename)
+            except requests.HTTPError as exc:
+                failed += 1
+                print(f"  FAILED {filename}: {exc}")
+                continue
+
+            blob.upload_blob(data, overwrite=False)
             uploaded += 1
             print(f"  uploaded -> {path}")
+            time.sleep(REQUEST_DELAY_SECONDS)  # be polite to nemweb
 
     if dry_run:
         print("\nDry run — nothing uploaded.")
     else:
-        print(f"\nDone. Uploaded {uploaded}, skipped {skipped} (already in bronze).")
+        print(f"\nDone. Uploaded {uploaded}, skipped {skipped} "
+              f"(already in bronze), failed {failed}.")
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
