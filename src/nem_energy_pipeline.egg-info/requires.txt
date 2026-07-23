@@ -1,0 +1,10 @@
+requests
+pydantic>=2
+pandas
+pyarrow
+azure-storage-blob
+azure-identity
+
+[dev]
+pytest
+ruff

@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: nem-energy-pipeline
+Version: 0.1.0
+Summary: AEMO NEM energy-market data pipeline on Azure (ADF + Power BI)
+Requires-Python: >=3.10
+Requires-Dist: requests
+Requires-Dist: pydantic>=2
+Requires-Dist: pandas
+Requires-Dist: pyarrow
+Requires-Dist: azure-storage-blob
+Requires-Dist: azure-identity
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
