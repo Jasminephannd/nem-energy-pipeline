@@ -1,0 +1,14 @@
+{
+	"name": "ls_sql_nem_gold",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"server": "sql-nem-v3gnwzv72hd7s.database.windows.net",
+			"database": "sqldb-nem-gold",
+			"encrypt": "mandatory",
+			"trustServerCertificate": false,
+			"authenticationType": "SystemAssignedManagedIdentity"
+		}
+	}
+}
