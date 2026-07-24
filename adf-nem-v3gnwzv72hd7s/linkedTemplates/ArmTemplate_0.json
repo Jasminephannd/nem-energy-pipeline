@@ -1,0 +1,241 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-nem-v3gnwzv72hd7s"
+		},
+		"ls_adls_nem_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://stnemv3gnwzv72hd7s.dfs.core.windows.net/"
+		},
+		"ls_sql_nem_gold_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "sql-nem-v3gnwzv72hd7s.database.windows.net"
+		},
+		"ls_sql_nem_gold_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "sqldb-nem-gold"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_adls_nem')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ls_adls_nem_properties_typeProperties_url')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_sql_nem_gold')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"server": "[parameters('ls_sql_nem_gold_properties_typeProperties_server')]",
+					"database": "[parameters('ls_sql_nem_gold_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SystemAssignedManagedIdentity"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_gold_fct_dispatch_price')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_sql_nem_gold",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "settlement_date",
+						"type": "datetime2",
+						"scale": 0
+					},
+					{
+						"name": "region_id",
+						"type": "varchar"
+					},
+					{
+						"name": "intervention",
+						"type": "tinyint",
+						"precision": 3
+					},
+					{
+						"name": "rrp",
+						"type": "decimal",
+						"precision": 12,
+						"scale": 5
+					},
+					{
+						"name": "date_key",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "interval_key",
+						"type": "smallint",
+						"precision": 5
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "fct_dispatch_price"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_sql_nem_gold')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_load_dispatch_price')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"linkedService": {
+								"referenceName": "ls_adls_nem",
+								"type": "LinkedServiceReference"
+							},
+							"name": "silverPrice"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "ds_gold_fct_dispatch_price",
+								"type": "DatasetReference"
+							},
+							"name": "goldPrice"
+						}
+					],
+					"transformations": [
+						{
+							"name": "castTs"
+						},
+						{
+							"name": "addKeys"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          settlementdate as string,",
+						"          regionid as string,",
+						"          rrp as double,",
+						"          intervention as long,",
+						"          lastchanged as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     format: 'parquet',",
+						"     fileSystem: 'silver',",
+						"     wildcardPaths:['dispatch_price/**/*.parquet']) ~> silverPrice",
+						"silverPrice derive(settlement_ts = toTimestamp(settlementdate, 'yyyy-MM-dd HH:mm:ss')) ~> castTs",
+						"castTs derive(date_key = year(settlement_ts) * 10000 + month(settlement_ts) * 100 + dayOfMonth(settlement_ts),",
+						"          interval_key = hour(settlement_ts) * 12 + toInteger(minute(settlement_ts) / 5)) ~> addKeys",
+						"addKeys sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          settlement_date as timestamp,",
+						"          region_id as string,",
+						"          intervention as integer,",
+						"          rrp as decimal(12,5),",
+						"          date_key as integer,",
+						"          interval_key as integer",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     truncate:true,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          settlement_date = settlement_ts,",
+						"          region_id = regionid,",
+						"          intervention,",
+						"          rrp,",
+						"          date_key,",
+						"          interval_key",
+						"     )) ~> goldPrice"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls_nem')]",
+				"[concat(variables('factoryId'), '/datasets/ds_gold_fct_dispatch_price')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_load_gold_dispatch_price')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "LoadDispatchPrice",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "df_load_dispatch_price",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"silverPrice": {},
+									"goldPrice": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/df_load_dispatch_price')]"
+			]
+		}
+	]
+}

@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-nem-v3gnwzv72hd7s"
+		},
+		"ls_adls_nem_properties_typeProperties_url": {
+			"value": "https://stnemv3gnwzv72hd7s.dfs.core.windows.net/"
+		},
+		"ls_sql_nem_gold_properties_typeProperties_server": {
+			"value": "sql-nem-v3gnwzv72hd7s.database.windows.net"
+		},
+		"ls_sql_nem_gold_properties_typeProperties_database": {
+			"value": "sqldb-nem-gold"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}
