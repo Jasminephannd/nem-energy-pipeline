@@ -1,0 +1,47 @@
+{
+	"name": "ds_gold_fct_dispatch_price",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sql_nem_gold",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "settlement_date",
+				"type": "datetime2",
+				"scale": 0
+			},
+			{
+				"name": "region_id",
+				"type": "varchar"
+			},
+			{
+				"name": "intervention",
+				"type": "tinyint",
+				"precision": 3
+			},
+			{
+				"name": "rrp",
+				"type": "decimal",
+				"precision": 12,
+				"scale": 5
+			},
+			{
+				"name": "date_key",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "interval_key",
+				"type": "smallint",
+				"precision": 5
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "fct_dispatch_price"
+		}
+	}
+}

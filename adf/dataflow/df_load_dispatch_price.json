@@ -1,0 +1,79 @@
+{
+	"name": "df_load_dispatch_price",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"linkedService": {
+						"referenceName": "ls_adls_nem",
+						"type": "LinkedServiceReference"
+					},
+					"name": "silverPrice"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_gold_fct_dispatch_price",
+						"type": "DatasetReference"
+					},
+					"name": "goldPrice"
+				}
+			],
+			"transformations": [
+				{
+					"name": "castTs"
+				},
+				{
+					"name": "addKeys"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          settlementdate as string,",
+				"          regionid as string,",
+				"          rrp as double,",
+				"          intervention as long,",
+				"          lastchanged as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     format: 'parquet',",
+				"     fileSystem: 'silver',",
+				"     wildcardPaths:['dispatch_price/**/*.parquet']) ~> silverPrice",
+				"silverPrice derive(settlement_ts = toTimestamp(settlementdate, 'yyyy-MM-dd HH:mm:ss')) ~> castTs",
+				"castTs derive(date_key = year(settlement_ts) * 10000 + month(settlement_ts) * 100 + dayOfMonth(settlement_ts),",
+				"          interval_key = hour(settlement_ts) * 12 + toInteger(minute(settlement_ts) / 5)) ~> addKeys",
+				"addKeys sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          settlement_date as timestamp,",
+				"          region_id as string,",
+				"          intervention as integer,",
+				"          rrp as decimal(12,5),",
+				"          date_key as integer,",
+				"          interval_key as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     truncate:true,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          settlement_date = settlement_ts,",
+				"          region_id = regionid,",
+				"          intervention,",
+				"          rrp,",
+				"          date_key,",
+				"          interval_key",
+				"     )) ~> goldPrice"
+			]
+		}
+	}
+}
