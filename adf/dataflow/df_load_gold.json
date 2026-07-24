@@ -49,7 +49,6 @@
 				"     store: 'sqlserver',",
 				"     schemaName: 'dbo',",
 				"     tableName: ($pTargetTable),",
-				"     preSQLs:['concat(\\'DELETE FROM dbo.\\', $pTargetTable)'],",
 				"     insertable: true,",
 				"     updateable: false,",
 				"     deletable: false,",
