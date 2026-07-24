@@ -1,0 +1,37 @@
+{
+	"name": "ds_etl_control",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sql_nem_gold",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "dataset_name",
+				"type": "varchar"
+			},
+			{
+				"name": "source_path",
+				"type": "varchar"
+			},
+			{
+				"name": "target_table",
+				"type": "varchar"
+			},
+			{
+				"name": "is_active",
+				"type": "bit"
+			},
+			{
+				"name": "notes",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "etl_control"
+		}
+	}
+}
