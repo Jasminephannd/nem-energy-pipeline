@@ -75,8 +75,37 @@ def rejected_path(dataset: Dataset, bronze_name: str) -> str:
     return f"{dataset.name}/{stem}.rejects.parquet"
 
 
+TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def timestamps_to_iso_strings(df: pd.DataFrame) -> pd.DataFrame:
+    """Write timestamps as ISO strings rather than binary Parquet timestamps.
+
+    Why not a real timestamp type? ADF Mapping Data Flow's Parquet reader
+    only recognises the *legacy* ConvertedType annotation, and that
+    annotation is defined as UTC-normalised. NEM time is naive AEST
+    (isAdjustedToUTC=false), which has no legacy representation - so
+    pyarrow correctly writes `converted_type: NONE`, ADF sees an
+    unannotated INT64, and the column reads as null.
+
+    Storing 'YYYY-MM-DD HH:MM:SS' strings sidesteps the whole interop
+    problem: every reader agrees on strings, and the value is legible to a
+    human opening the file. The Data Flow casts back with toTimestamp().
+
+    The AEST rule is not weakened - it lives in the parser and its tests,
+    which assert the +10:00 offset. These strings are AEST wall-clock.
+    """
+    for col in df.columns:
+        dtype = df[col].dtype
+        if isinstance(dtype, pd.DatetimeTZDtype):
+            df[col] = df[col].dt.tz_localize(None)
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.strftime(TIMESTAMP_FORMAT)
+    return df
+
+
 def records_to_parquet(records: list) -> bytes:
-    df = pd.DataFrame([r.model_dump() for r in records])
+    df = timestamps_to_iso_strings(pd.DataFrame([r.model_dump() for r in records]))
     buf = io.BytesIO()
     df.to_parquet(buf, index=False)
     return buf.getvalue()
