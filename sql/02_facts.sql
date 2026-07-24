@@ -28,7 +28,25 @@ CREATE TABLE dbo.fct_dispatch_price (
         FOREIGN KEY (interval_key) REFERENCES dbo.dim_interval(interval_key)
 );
 
-/* fct_unit_dispatch + dim_unit come next, once the DUID ->
-   fuel-type / renewable-flag source is wired in. Kept separate
-   so fct_dispatch_price can load and be demoed on its own -
-   a legitimate end-of-Day-3 milestone. */
+/* ---- fct_unit_dispatch -------------------------------------
+   Grain: one row per generating unit (DUID) per 5-minute
+          dispatch interval. Measure: scada_mw (MW, may be
+          negative - batteries charging, pumped hydro pumping).
+
+   NOTE: no FK to dim_unit yet. The DUID -> fuel type /
+   renewable flag dimension needs AEMO's registration list,
+   which isn't wired in. duid is stored as the natural key so
+   the FK can be added later without reshaping the fact.        */
+IF OBJECT_ID('dbo.fct_unit_dispatch','U') IS NOT NULL DROP TABLE dbo.fct_unit_dispatch;
+CREATE TABLE dbo.fct_unit_dispatch (
+    settlement_date DATETIME2(0)  NOT NULL,
+    duid            VARCHAR(20)   NOT NULL,
+    scada_mw        DECIMAL(12,4) NOT NULL,
+    date_key        INT           NOT NULL,
+    interval_key    SMALLINT      NOT NULL,
+    CONSTRAINT pk_fct_unit_dispatch PRIMARY KEY (settlement_date, duid),
+    CONSTRAINT fk_scada_date
+        FOREIGN KEY (date_key)     REFERENCES dbo.dim_date(date_key),
+    CONSTRAINT fk_scada_interval
+        FOREIGN KEY (interval_key) REFERENCES dbo.dim_interval(interval_key)
+);

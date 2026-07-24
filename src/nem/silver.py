@@ -37,17 +37,37 @@ REJECTED_CONTAINER = "rejected"
 
 @dataclass(frozen=True)
 class Dataset:
-    """Maps one silver dataset to its bronze source and parser."""
+    """Maps one silver dataset to its bronze source, parser and output shape."""
 
     name: str  # silver folder, e.g. "dispatch_price"
     bronze_prefix: str  # bronze feed prefix, e.g. "dispatchis"
     parser: Callable[[str], tuple[list, list[Reject]]]
+    # Parser field -> gold column name. Doubles as a column selector: fields
+    # not listed here are dropped. Conforming names to the gold model is a
+    # silver responsibility - it's what lets ONE generic, parameterised ADF
+    # Data Flow serve every dataset instead of one bespoke flow per table.
+    column_map: dict[str, str]
 
 
 # Metadata-driven, like the extractor's FEEDS: adding a dataset is one entry.
 DATASETS: dict[str, Dataset] = {
-    "dispatch_price": Dataset("dispatch_price", "dispatchis", parse_dispatch_price),
-    "unit_scada": Dataset("unit_scada", "dispatch_scada", parse_unit_scada),
+    "dispatch_price": Dataset(
+        "dispatch_price", "dispatchis", parse_dispatch_price,
+        {
+            "settlementdate": "settlement_date",
+            "regionid": "region_id",
+            "intervention": "intervention",
+            "rrp": "rrp",
+        },
+    ),
+    "unit_scada": Dataset(
+        "unit_scada", "dispatch_scada", parse_unit_scada,
+        {
+            "settlementdate": "settlement_date",
+            "duid": "duid",
+            "scadavalue": "scada_mw",
+        },
+    ),
 }
 
 
@@ -104,8 +124,10 @@ def timestamps_to_iso_strings(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def records_to_parquet(records: list) -> bytes:
+def records_to_parquet(records: list, column_map: dict[str, str]) -> bytes:
     df = timestamps_to_iso_strings(pd.DataFrame([r.model_dump() for r in records]))
+    # Select + rename to the gold column names in one step.
+    df = df[list(column_map)].rename(columns=column_map)
     buf = io.BytesIO()
     df.to_parquet(buf, index=False)
     return buf.getvalue()
@@ -151,7 +173,7 @@ def run(account: str, datasets: list[Dataset], overwrite: bool, dry_run: bool) -
             valid, rejects = ds.parser(csv_text_from_zip(raw))
 
             if valid:
-                sblob.upload_blob(records_to_parquet(valid), overwrite=True)
+                sblob.upload_blob(records_to_parquet(valid, ds.column_map), overwrite=True)
                 rows += len(valid)
             if rejects:
                 rej_blob = rejected.get_blob_client(rejected_path(ds, blob.name))
