@@ -1,0 +1,59 @@
+{
+	"name": "df_load_gold",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"linkedService": {
+						"referenceName": "ls_adls_nem",
+						"type": "LinkedServiceReference"
+					},
+					"name": "silverSrc"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_gold_table",
+						"type": "DatasetReference"
+					},
+					"name": "goldSink"
+				}
+			],
+			"transformations": [
+				{
+					"name": "castTs"
+				},
+				{
+					"name": "addKeys"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     pSourcePath as string,",
+				"     pTargetTable as string",
+				"}",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     format: 'parquet',",
+				"     fileSystem: 'silver',",
+				"     wildcardPaths:[($pSourcePath)]) ~> silverSrc",
+				"silverSrc derive(settlement_date = toTimestamp(byName('settlement_date'), 'yyyy-MM-dd HH:mm:ss')) ~> castTs",
+				"castTs derive(date_key = year(settlement_date) * 10000 + month(settlement_date) * 100 + dayOfMonth(settlement_date),",
+				"          interval_key = hour(settlement_date) * 12 + toInteger(minute(settlement_date) / 5)) ~> addKeys",
+				"addKeys sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> goldSink"
+			]
+		}
+	}
+}
