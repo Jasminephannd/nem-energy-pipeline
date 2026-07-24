@@ -22,11 +22,8 @@
 						"partitionOption": "None"
 					},
 					"dataset": {
-						"referenceName": "ds_gold_table",
-						"type": "DatasetReference",
-						"parameters": {
-							"tableName": "etl_control"
-						}
+						"referenceName": "ds_etl_control",
+						"type": "DatasetReference"
 					},
 					"firstRowOnly": false
 				}
@@ -64,8 +61,18 @@
 							"userProperties": [],
 							"typeProperties": {
 								"dataflow": {
-									"referenceName": "df_load_dispatch_price",
-									"type": "DataFlowReference"
+									"referenceName": "df_load_gold",
+									"type": "DataFlowReference",
+									"parameters": {
+										"pSourcePath": {
+											"value": "'@{item().source_path}'",
+											"type": "Expression"
+										},
+										"pTargetTable": {
+											"value": "'@{item().target_table}'",
+											"type": "Expression"
+										}
+									}
 								},
 								"compute": {
 									"coreCount": 8,

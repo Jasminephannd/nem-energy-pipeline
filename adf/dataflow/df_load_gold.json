@@ -14,9 +14,9 @@
 			],
 			"sinks": [
 				{
-					"dataset": {
-						"referenceName": "ds_gold_table",
-						"type": "DatasetReference"
+					"linkedService": {
+						"referenceName": "ls_sql_nem_gold",
+						"type": "LinkedServiceReference"
 					},
 					"name": "goldSink"
 				}
@@ -45,11 +45,15 @@
 				"          interval_key = hour(settlement_date) * 12 + toInteger(minute(settlement_date) / 5)) ~> addKeys",
 				"addKeys sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
-				"     deletable:false,",
-				"     insertable:true,",
-				"     updateable:false,",
-				"     upsertable:false,",
 				"     format: 'table',",
+				"     store: 'sqlserver',",
+				"     schemaName: 'dbo',",
+				"     tableName: ($pTargetTable),",
+				"     preSQLs:['concat(\\'DELETE FROM dbo.\\', $pTargetTable)'],",
+				"     insertable: true,",
+				"     updateable: false,",
+				"     deletable: false,",
+				"     upsertable: false,",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
 				"     errorHandlingOption: 'stopOnFirstError') ~> goldSink"
